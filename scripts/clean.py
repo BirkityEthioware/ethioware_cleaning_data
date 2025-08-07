@@ -14,7 +14,7 @@ def clean_linkedin_data(df, dataset_name):
     """
     logging.info(f"Cleaning {dataset_name} dataset")
     
-    # Convert Date to datetime (handle MM/DD/YYYY format)
+    # Convert Date to datetime
     initial_rows = len(df)
     df["Date"] = pd.to_datetime(df["Date"], format="%m/%d/%Y", errors="coerce")
     null_dates = df["Date"].isnull().sum()
@@ -49,10 +49,17 @@ def clean_linkedin_data(df, dataset_name):
     logging.info(f"Dropped {initial_rows - len(df)} rows with missing values")
     
     # Validate numerical columns (no negative values, exclude engagement rates)
+    negative_summary = {}
     for col in numerical_columns[:-3]:
-        if (df[col] < 0).any():
-            logging.warning(f"Negative values found in '{col}', setting to 0")
+        negative_rows = (df[col] < 0).sum()
+        if negative_rows > 0:
+            negative_summary[col] = negative_rows
+            logging.warning(f"Negative values found in '{col}' for {negative_rows} rows, setting to 0")
             df[col] = df[col].clip(lower=0)
+    
+    # Log negative values summary
+    if negative_summary:
+        logging.info(f"Summary of negative values corrected: {negative_summary}")
     
     # Validate engagement rates
     df["calculated_engagement"] = (

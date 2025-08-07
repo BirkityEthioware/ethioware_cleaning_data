@@ -27,27 +27,43 @@ def bronze_to_silver():
     website_df.to_parquet("data/processed/website_cleaned.parquet", index=False)
     logging.info("Saved cleaned data to Silver layer")
 
+# scripts/pipeline.py
 def silver_to_gold():
-    """Transform Silver layer data into Gold layer for analysis."""
     # Load Silver data
     linkedin_df = pd.read_parquet("data/processed/linkedin_cleaned.parquet")
     website_df = pd.read_parquet("data/processed/website_cleaned.parquet")
     logging.info("Loaded Silver layer data")
     
-    # Aggregate LinkedIn data by month
+    # LinkedIn: Monthly aggregates
     linkedin_df["month"] = linkedin_df["Date"].dt.to_period("M")
-    linkedin_agg = linkedin_df.groupby("month").agg({
+    linkedin_monthly = linkedin_df.groupby("month").agg({
         "Impressions (total)": "sum",
         "Clicks (total)": "sum",
+        "Reactions (total)": "sum",
         "Engagement rate (total)": "mean"
     }).reset_index()
-    linkedin_agg.to_parquet("data/final/linkedin_monthly.parquet", index=False)
-    logging.info("Saved aggregated LinkedIn data to Gold layer")
+    linkedin_monthly.to_parquet("data/final/linkedin_monthly.parquet", index=False)
+    logging.info("Saved monthly LinkedIn aggregates to Gold layer")
     
-    # Website data (already aggregated by country)
+    # LinkedIn: Weekly aggregates
+    linkedin_df["week"] = linkedin_df["Date"].dt.to_period("W")
+    linkedin_weekly = linkedin_df.groupby("week").agg({
+        "Impressions (total)": "sum",
+        "Clicks (total)": "sum",
+        "Reactions (total)": "sum"
+    }).reset_index()
+    linkedin_weekly.to_parquet("data/final/linkedin_weekly.parquet", index=False)
+    logging.info("Saved weekly LinkedIn aggregates to Gold layer")
+    
+    # Website: Top 10 countries by requests
+    website_top10 = website_df.nlargest(10, "requests")
+    website_top10.to_parquet("data/final/website_top10_countries.parquet", index=False)
+    logging.info("Saved top 10 Website countries to Gold layer")
+    
+    # Website: Full dataset
     website_df.to_parquet("data/final/website_requests_by_country.parquet", index=False)
     logging.info("Saved Website data to Gold layer")
 
 if __name__ == "__main__":
     bronze_to_silver()
-    silver_to_gold()
+    silver_to_gold()    
