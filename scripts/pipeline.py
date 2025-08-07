@@ -1,4 +1,4 @@
-# scripts/pipeline.py
+
 from pathlib import Path
 import pandas as pd
 import logging
@@ -13,40 +13,49 @@ logging.basicConfig(
 
 def bronze_to_silver():
     """Ingest raw data and clean it for the Silver layer."""
-    # Load raw data (Bronze)
-    linkedin_df = pd.read_excel("data/raw/linkedin_stats.xls", header=1)
-    website_df = pd.read_csv("data/raw/website_requests.csv")
-    logging.info("Loaded raw data into Bronze layer")
+    try:
+        linkedin_df = pd.read_excel("data/raw/linkedin_stats.xls", header=1)
+        website_df = pd.read_csv("data/raw/website_requests.csv")
+        logging.info("Loaded raw data into Bronze layer")
+    except Exception as e:
+        logging.error(f"Error loading raw data: {str(e)}")
+        raise
     
-    # Clean and normalize
     linkedin_df = clean_linkedin_data(linkedin_df, "LinkedIn")
     website_df = clean_website_data(website_df, "Website")
     
-    # Save to Silver layer
     linkedin_df.to_parquet("data/processed/linkedin_cleaned.parquet", index=False)
     website_df.to_parquet("data/processed/website_cleaned.parquet", index=False)
     logging.info("Saved cleaned data to Silver layer")
 
-# scripts/pipeline.py
 def silver_to_gold():
-    # Load Silver data
-    linkedin_df = pd.read_parquet("data/processed/linkedin_cleaned.parquet")
-    website_df = pd.read_parquet("data/processed/website_cleaned.parquet")
-    logging.info("Loaded Silver layer data")
+    """Transform Silver layer data into Gold layer for analysis."""
+    try:
+        linkedin_df = pd.read_parquet("data/processed/linkedin_cleaned.parquet")
+        website_df = pd.read_parquet("data/processed/website_cleaned.parquet")
+        logging.info("Loaded Silver layer data")
+    except Exception as e:
+        logging.error(f"Error loading Silver layer data: {str(e)}")
+        raise
     
     # LinkedIn: Monthly aggregates
-    linkedin_df["month"] = linkedin_df["Date"].dt.to_period("M")
+    linkedin_df["month"] = linkedin_df["Date"].dt.strftime("%Y-%m")  # Convert to YYYY-MM string
+    logging.info(f"LinkedIn month column type: {linkedin_df['month'].dtype}")
+    logging.info(f"LinkedIn month sample values: {linkedin_df['month'].head().tolist()}")
     linkedin_monthly = linkedin_df.groupby("month").agg({
         "Impressions (total)": "sum",
         "Clicks (total)": "sum",
         "Reactions (total)": "sum",
+        "Comments (total)": "sum",
         "Engagement rate (total)": "mean"
     }).reset_index()
+    logging.info(f"LinkedIn monthly month column type: {linkedin_monthly['month'].dtype}")
+    logging.info(f"LinkedIn monthly sample values: {linkedin_monthly['month'].head().tolist()}")
     linkedin_monthly.to_parquet("data/final/linkedin_monthly.parquet", index=False)
     logging.info("Saved monthly LinkedIn aggregates to Gold layer")
     
     # LinkedIn: Weekly aggregates
-    linkedin_df["week"] = linkedin_df["Date"].dt.to_period("W")
+    linkedin_df["week"] = linkedin_df["Date"].dt.strftime("%Y-%W")  # Convert to YYYY-WW string
     linkedin_weekly = linkedin_df.groupby("week").agg({
         "Impressions (total)": "sum",
         "Clicks (total)": "sum",
@@ -66,4 +75,4 @@ def silver_to_gold():
 
 if __name__ == "__main__":
     bronze_to_silver()
-    silver_to_gold()    
+    silver_to_gold()
