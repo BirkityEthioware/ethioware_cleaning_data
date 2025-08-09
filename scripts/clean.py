@@ -1,4 +1,3 @@
-# scripts/clean.py
 import pandas as pd
 import logging
 import pycountry
